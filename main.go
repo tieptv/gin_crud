@@ -1,10 +1,13 @@
 package main
 
 import (
+	"gin_crud/controllers"
 	"gin_crud/db"
 	_ "gin_crud/docs"
 	"gin_crud/models"
-	"gin_crud/routes"
+	"gin_crud/repositories"
+	"gin_crud/services"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	_ "github.com/swaggo/gin-swagger"
@@ -23,9 +26,24 @@ func main() {
 	db.ConnectDB()
 
 	// Auto migrate
-	db.DB.AutoMigrate(&models.User{})
+	err := db.DB.AutoMigrate(&models.User{})
+	if err != nil {
+		return
+	}
 
-	routes.UserRoute(r)
+	userRepo := repositories.NewUserRepository(db.DB)
+	userService := services.NewUserService(userRepo)
+	userController := controllers.NewUserController(userService)
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: false,
+	}))
+	userController.RegisterUserRoutes(r)
+
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	r.Run(":8080")
 }
